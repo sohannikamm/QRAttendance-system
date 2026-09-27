@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Report</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f4f6f8;
+            color: #222;
+            padding: 32px 16px;
+        }
+
+        .card {
+            width: 100%;
+            max-width: 900px;
+            background: #fff;
+            padding: 32px;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        #status {
+            text-align: center;
+            margin: 0 0 20px;
+            color: #555;
+        }
+
+        #status.error {
+            color: #991b1b;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 10px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+        }
+
+        th {
+            background: #f8fafc;
+            font-weight: bold;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .type-in {
+            color: #065f46;
+            font-weight: bold;
+        }
+
+        .type-out {
+            color: #9a3412;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Attendance Report</h1>
+        <p id="status">Loading attendance records...</p>
+        <table id="reportTable" hidden>
+            <thead>
+                <tr>
+                    <th>Employee Name</th>
+                    <th>Type</th>
+                    <th>Timestamp</th>
+                </tr>
+            </thead>
+            <tbody id="reportBody"></tbody>
+        </table>
+    </div>
+
+    <script th:inline="none">
+        const status = document.getElementById("status");
+        const reportTable = document.getElementById("reportTable");
+        const reportBody = document.getElementById("reportBody");
+
+        function formatTimestamp(value) {
+            if (!value) {
+                return "Unknown";
+            }
+
+            const date = new Date(value);
+            if (isNaN(date.getTime())) {
+                return String(value);
+            }
+
+            return date.toLocaleString(undefined, {
+                weekday: "short",
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit"
+            });
+        }
+
+        async function loadReport() {
+            try {
+                const [attendanceResponse, employeesResponse] = await Promise.all([
+                    fetch("http://localhost:8080/api/attendance"),
+                    fetch("http://localhost:8080/api/employees")
+                ]);
+
+                if (!attendanceResponse.ok) {
+                    throw new Error("Attendance request failed with status " + attendanceResponse.status);
+                }
+
+                if (!employeesResponse.ok) {
+                    throw new Error("Employees request failed with status " + employeesResponse.status);
+                }
+
+                const records = await attendanceResponse.json();
+                const employees = await employeesResponse.json();
+
+                const namesById = {};
+                employees.forEach(function (employee) {
+                    namesById[employee.id] = employee.name;
+                });
+
+                records.sort(function (a, b) {
+                    return new Date(b.timestamp) - new Date(a.timestamp);
+                });
+
+                if (!records.length) {
+                    status.textContent = "No attendance records found.";
+                    return;
+                }
+
+                reportBody.innerHTML = "";
+
+                records.forEach(function (record) {
+                    const row = document.createElement("tr");
+
+                    const nameCell = document.createElement("td");
+                    nameCell.textContent = namesById[record.employeeId] || ("Employee #" + record.employeeId);
+
+                    const typeCell = document.createElement("td");
+                    typeCell.textContent = record.type;
+                    typeCell.className = record.type === "CHECK_IN" ? "type-in" : "type-out";
+
+                    const timeCell = document.createElement("td");
+                    timeCell.textContent = formatTimestamp(record.timestamp);
+
+                    row.appendChild(nameCell);
+                    row.appendChild(typeCell);
+                    row.appendChild(timeCell);
+                    reportBody.appendChild(row);
+                });
+
+                status.textContent = "";
+                reportTable.hidden = false;
+            } catch (error) {
+                status.className = "error";
+                status.textContent = "Could not load attendance report. " + error.message;
+            }
+        }
+
+        loadReport();
+    </script>
+</body>
+</html>

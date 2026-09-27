@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employees</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f4f6f8;
+            color: #222;
+            padding: 32px 16px;
+        }
+
+        .page {
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            margin: 0 0 24px;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        #status {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #555;
+        }
+
+        #status.error {
+            color: #991b1b;
+        }
+
+        #employeeList {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: #fff;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+            text-align: center;
+        }
+
+        .card h2 {
+            margin: 0 0 8px;
+            font-size: 18px;
+        }
+
+        .card p {
+            margin: 0 0 16px;
+            color: #555;
+            font-size: 14px;
+            word-break: break-all;
+        }
+
+        .card img {
+            width: 180px;
+            height: 180px;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <h1>Employees</h1>
+        <div id="status">Loading employees...</div>
+        <div id="employeeList"></div>
+    </div>
+
+    <script th:inline="none">
+        const status = document.getElementById("status");
+        const employeeList = document.getElementById("employeeList");
+
+        async function loadEmployees() {
+            try {
+                const response = await fetch("http://localhost:8080/api/employees");
+
+                if (!response.ok) {
+                    throw new Error("Request failed with status " + response.status);
+                }
+
+                const employees = await response.json();
+
+                if (!employees.length) {
+                    status.textContent = "No employees found.";
+                    return;
+                }
+
+                status.textContent = "";
+                employeeList.innerHTML = "";
+
+                employees.forEach(function (employee) {
+                    const card = document.createElement("div");
+                    card.className = "card";
+
+                    const name = document.createElement("h2");
+                    name.textContent = employee.name;
+
+                    const email = document.createElement("p");
+                    email.textContent = employee.email;
+
+                    const qrImage = document.createElement("img");
+                    qrImage.src = "http://localhost:8080/api/employees/" + employee.id + "/qrcode";
+                    qrImage.alt = "QR code for " + employee.name;
+
+                    card.appendChild(name);
+                    card.appendChild(email);
+                    card.appendChild(qrImage);
+                    employeeList.appendChild(card);
+                });
+            } catch (error) {
+                status.className = "error";
+                status.textContent = "Could not load employees. " + error.message;
+            }
+        }
+
+        loadEmployees();
+    </script>
+</body>
+</html>
